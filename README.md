@@ -3,9 +3,9 @@
 A sleek, minimal, and powerful PC cleaner and application uninstaller for Windows, built with Python and customtkinter.
 
 <div align="center">
-  <img src="https://github.com/hitmanthatcodes/SysCleanX/blob/main/SysCleanX-MainMenu.png?raw=true" alt="Main Menu" width="270"/>
-  <img src="https://github.com/hitmanthatcodes/SysCleanX/blob/main/SysCleanX-ReScanMenu.png?raw=true" alt="ReScan Menu" width="270"/>
-  <img src="https://github.com/hitmanthatcodes/SysCleanX/blob/main/SysCleanX-AppUninstallerMenu.png?raw=true" alt="App Uninstaller Menu" width="270"/>
+  <img src="https://github.com/htmnsrc/SysCleanX/blob/main/SysCleanX-MainMenu.png?raw=true" alt="Main Menu" width="270"/>
+  <img src="https://github.com/htmnsrc/SysCleanX/blob/main/SysCleanX-ReScanMenu.png?raw=true" alt="ReScan Menu" width="270"/>
+  <img src="https://github.com/htmnsrc/SysCleanX/blob/main/SysCleanX-AppUninstallerMenu.png?raw=true" alt="App Uninstaller Menu" width="270"/>
 </div>
 
 ## About The Project
@@ -28,7 +28,7 @@ To run the project from the source code, you'll need Python and a few dependenci
     * pip (Python package installer)
 2.  **Installation**
     ```sh
-    git clone https://github.com/hitmanthatcodes/SysCleanX.git
+    git clone https://github.com/htmnsrc/SysCleanX.git
     cd SysCleanX
     pip install -r requirements.txt
     ```
