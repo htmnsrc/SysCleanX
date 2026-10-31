@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/gui"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+license = "MIT"
+authors = ["Hitman"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+# Third-party crates (UI, rendering) optimized for size; our engine and hashing for speed.
+[profile.release.package."*"]
+opt-level = "s"
+
+[profile.release.package.xxhash-rust]
+opt-level = 3
+
+[profile.release.package.rayon-core]
+opt-level = 3

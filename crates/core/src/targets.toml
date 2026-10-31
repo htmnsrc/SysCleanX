@@ -1,0 +1,642 @@
+# SysCleanX built-in cleaning targets.
+#
+# Fields: id, name, group, level (safe|recommended|expert), description, admin,
+# paths (%ENV% + * ? wildcards), profile_subpaths, subpaths, include, exclude,
+# exclude_paths, min_age_hours, recursive, remove_root, skip_markers, empty_dirs,
+# processes, services, special, cleanmgr, resolver, default_on.
+#
+# Folders listed in `paths` are emptied (the folder itself is kept); files are deleted.
+# Every path still passes the hard-coded safety guard in guard.rs.
+
+# ─────────────────────────────── System ───────────────────────────────
+
+[[target]]
+id = "user-temp"
+name = "User temporary files"
+group = "System"
+level = "safe"
+description = "Temp folders of every user account. Files touched in the last 24 hours are kept."
+paths = ['%TEMP%', '%LOCALAPPDATA%\Temp', '%SystemDrive%\Users\*\AppData\Local\Temp']
+min_age_hours = 24
+
+[[target]]
+id = "windows-temp"
+name = "Windows temporary files"
+group = "System"
+level = "safe"
+admin = true
+description = "System-wide temp folder. Files touched in the last 24 hours are kept."
+paths = ['%SystemRoot%\Temp']
+min_age_hours = 24
+
+[[target]]
+id = "recycle-bin"
+name = "Recycle Bin"
+group = "System"
+level = "safe"
+description = "Empties the Recycle Bin on all drives."
+special = "recycle-bin"
+
+[[target]]
+id = "windows-update"
+name = "Windows Update cache"
+group = "System"
+level = "recommended"
+admin = true
+description = "Downloads of updates that are already installed. Windows Update is paused while cleaning."
+paths = ['%SystemRoot%\SoftwareDistribution\Download']
+services = ["wuauserv", "bits"]
+
+[[target]]
+id = "delivery-optimization"
+name = "Delivery Optimization cache"
+group = "System"
+level = "safe"
+admin = true
+description = "Update files cached for sharing with other PCs."
+paths = ['%SystemRoot%\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache']
+services = ["DoSvc"]
+
+[[target]]
+id = "error-reports"
+name = "Windows error reports"
+group = "System"
+level = "safe"
+description = "Queued and archived Windows Error Reporting files."
+paths = [
+  '%ProgramData%\Microsoft\Windows\WER\ReportArchive',
+  '%ProgramData%\Microsoft\Windows\WER\ReportQueue',
+  '%ProgramData%\Microsoft\Windows\WER\Temp',
+  '%LOCALAPPDATA%\Microsoft\Windows\WER\ReportArchive',
+  '%LOCALAPPDATA%\Microsoft\Windows\WER\ReportQueue',
+]
+
+[[target]]
+id = "memory-dumps"
+name = "Memory dumps"
+group = "System"
+level = "recommended"
+description = "Crash dumps from blue screens and app crashes. Only useful for diagnosing crashes."
+paths = ['%SystemRoot%\MEMORY.DMP', '%SystemRoot%\Minidump', '%SystemRoot%\LiveKernelReports', '%LOCALAPPDATA%\CrashDumps']
+include = ["*.dmp"]
+
+[[target]]
+id = "windows-logs"
+name = "Windows log files"
+group = "System"
+level = "recommended"
+admin = true
+description = "Setup, servicing and update logs older than 7 days."
+paths = [
+  '%SystemRoot%\Logs\CBS',
+  '%SystemRoot%\Logs\DISM',
+  '%SystemRoot%\Logs\MoSetup',
+  '%SystemRoot%\Logs\WindowsUpdate',
+  '%SystemRoot%\Logs\SIH',
+  '%SystemRoot%\Logs\waasmedic',
+  '%SystemRoot%\Logs\NetSetup',
+  '%SystemRoot%\debug',
+]
+include = ["*.log", "*.etl", "*.cab", "*.log.old"]
+min_age_hours = 168
+
+[[target]]
+id = "thumbnail-cache"
+name = "Thumbnail & icon cache"
+group = "System"
+level = "recommended"
+description = "Explorer rebuilds it automatically. Files Explorer is using are skipped."
+paths = ['%LOCALAPPDATA%\Microsoft\Windows\Explorer', '%LOCALAPPDATA%\IconCache.db']
+include = ["thumbcache_*.db", "iconcache_*.db", "IconCache.db"]
+recursive = false
+
+[[target]]
+id = "shader-cache"
+name = "DirectX & GPU shader caches"
+group = "System"
+level = "recommended"
+default_on = false
+description = "Rebuilt automatically. Games may stutter briefly the first time they start afterwards."
+paths = [
+  '%LOCALAPPDATA%\D3DSCache',
+  '%LOCALAPPDATA%\NVIDIA\DXCache',
+  '%LOCALAPPDATA%\NVIDIA\GLCache',
+  '%LOCALAPPDATA%\NVIDIA Corporation\NV_Cache',
+  '%LOCALAPPDATA%\AMD\DxCache',
+  '%LOCALAPPDATA%\AMD\DxcCache',
+  '%LOCALAPPDATA%\AMD\GLCache',
+  '%LOCALAPPDATA%\AMD\VkCache',
+  '%LOCALAPPDATA%\Intel\ShaderCache',
+  '%USERPROFILE%\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache',
+  '%USERPROFILE%\AppData\LocalLow\NVIDIA\PerDriverVersion\GLCache',
+]
+
+[[target]]
+id = "gpu-installers"
+name = "GPU driver installer leftovers"
+group = "System"
+level = "recommended"
+description = "Extracted NVIDIA/AMD driver setup files and downloaded driver packages."
+paths = ['%SystemDrive%\NVIDIA', '%SystemDrive%\AMD', '%ProgramData%\NVIDIA Corporation\Downloader']
+
+[[target]]
+id = "store-app-temp"
+name = "Store app temporary files"
+group = "System"
+level = "recommended"
+description = "Temp and web cache folders of Microsoft Store apps."
+paths = ['%LOCALAPPDATA%\Packages\*\AC\Temp', '%LOCALAPPDATA%\Packages\*\AC\INetCache', '%LOCALAPPDATA%\Packages\*\TempState']
+min_age_hours = 24
+
+[[target]]
+id = "windows-upgrade-leftovers"
+name = "Windows upgrade leftovers"
+group = "System"
+level = "recommended"
+admin = true
+description = "Temporary setup files, upgrade logs and install media left by feature updates (via Windows Disk Cleanup)."
+paths = ['%SystemDrive%\$Windows.~BT', '%SystemDrive%\$Windows.~WS', '%SystemDrive%\ESD']
+special = "cleanmgr"
+cleanmgr = ["Temporary Setup Files", "Windows Upgrade Log Files", "Upgrade Discarded Files", "Windows ESD installation files", "Setup Log Files"]
+
+# ─────────────────────────────── Browsers ─────────────────────────────
+# Chromium browsers are generated from [[chromium]] entries at the end of this file
+# (cache target in "Browsers", history + cookies targets in "Privacy").
+
+[[target]]
+id = "firefox"
+name = "Mozilla Firefox"
+group = "Browsers"
+level = "safe"
+description = "Cache, startup cache, thumbnails and crash reports for every profile."
+paths = [
+  '%LOCALAPPDATA%\Mozilla\Firefox\Profiles\*\cache2',
+  '%LOCALAPPDATA%\Mozilla\Firefox\Profiles\*\startupCache',
+  '%LOCALAPPDATA%\Mozilla\Firefox\Profiles\*\thumbnails',
+  '%LOCALAPPDATA%\Mozilla\Firefox\Profiles\*\jumpListCache',
+  '%APPDATA%\Mozilla\Firefox\Profiles\*\shader-cache',
+  '%APPDATA%\Mozilla\Firefox\Crash Reports\submitted',
+  '%APPDATA%\Mozilla\Firefox\Crash Reports\pending',
+]
+processes = ["firefox.exe"]
+
+[[target]]
+id = "librewolf"
+name = "LibreWolf"
+group = "Browsers"
+level = "safe"
+paths = ['%LOCALAPPDATA%\librewolf\Profiles\*\cache2', '%LOCALAPPDATA%\librewolf\Profiles\*\startupCache']
+processes = ["librewolf.exe"]
+
+[[target]]
+id = "waterfox"
+name = "Waterfox"
+group = "Browsers"
+level = "safe"
+paths = ['%LOCALAPPDATA%\Waterfox\Profiles\*\cache2', '%LOCALAPPDATA%\Waterfox\Profiles\*\startupCache']
+processes = ["waterfox.exe"]
+
+[[target]]
+id = "inet-cache"
+name = "Internet Explorer & legacy web cache"
+group = "Browsers"
+level = "safe"
+description = "WinINet cache used by Internet Explorer mode and older apps."
+paths = ['%LOCALAPPDATA%\Microsoft\Windows\INetCache']
+
+# ───────────────────────────── Applications ───────────────────────────
+
+[[target]]
+id = "discord"
+name = "Discord"
+group = "Applications"
+level = "safe"
+paths = [
+  '%APPDATA%\discord*\Cache',
+  '%APPDATA%\discord*\Code Cache',
+  '%APPDATA%\discord*\GPUCache',
+  '%APPDATA%\discord*\DawnCache',
+  '%APPDATA%\discord*\DawnGraphiteCache',
+]
+processes = ["discord.exe", "discordptb.exe", "discordcanary.exe"]
+
+[[target]]
+id = "spotify"
+name = "Spotify"
+group = "Applications"
+level = "recommended"
+description = "Streaming cache. Spotify rebuilds it as you listen."
+paths = [
+  '%LOCALAPPDATA%\Spotify\Data',
+  '%LOCALAPPDATA%\Spotify\Browser\Cache',
+  '%LOCALAPPDATA%\Packages\SpotifyAB.SpotifyMusic_*\LocalCache\Spotify\Data',
+]
+processes = ["spotify.exe"]
+
+[[target]]
+id = "teams"
+name = "Microsoft Teams"
+group = "Applications"
+level = "safe"
+paths = [
+  '%APPDATA%\Microsoft\Teams\Cache',
+  '%APPDATA%\Microsoft\Teams\Code Cache',
+  '%APPDATA%\Microsoft\Teams\GPUCache',
+  '%APPDATA%\Microsoft\Teams\Service Worker\CacheStorage',
+  '%APPDATA%\Microsoft\Teams\tmp',
+  '%LOCALAPPDATA%\Packages\MSTeams_8wekyb3d8bbwe\LocalCache\Microsoft\MSTeams\EBWebView\Default\Cache',
+  '%LOCALAPPDATA%\Packages\MSTeams_8wekyb3d8bbwe\LocalCache\Microsoft\MSTeams\EBWebView\Default\Code Cache',
+  '%LOCALAPPDATA%\Packages\MSTeams_8wekyb3d8bbwe\LocalCache\Microsoft\MSTeams\EBWebView\Default\GPUCache',
+  '%LOCALAPPDATA%\Packages\MSTeams_8wekyb3d8bbwe\LocalCache\Microsoft\MSTeams\EBWebView\Default\Service Worker\CacheStorage',
+]
+processes = ["teams.exe", "ms-teams.exe"]
+
+[[target]]
+id = "slack"
+name = "Slack"
+group = "Applications"
+level = "safe"
+paths = [
+  '%APPDATA%\Slack\Cache',
+  '%APPDATA%\Slack\Code Cache',
+  '%APPDATA%\Slack\GPUCache',
+  '%APPDATA%\Slack\Service Worker\CacheStorage',
+  '%APPDATA%\Slack\logs',
+]
+processes = ["slack.exe"]
+
+[[target]]
+id = "vscode"
+name = "Visual Studio Code"
+group = "Applications"
+level = "safe"
+description = "Caches, old compiled data, downloaded extension packages and logs."
+paths = [
+  '%APPDATA%\Code\Cache',
+  '%APPDATA%\Code\CachedData',
+  '%APPDATA%\Code\Code Cache',
+  '%APPDATA%\Code\GPUCache',
+  '%APPDATA%\Code\CachedExtensionVSIXs',
+  '%APPDATA%\Code\Service Worker\CacheStorage',
+  '%APPDATA%\Code\logs',
+  '%APPDATA%\Code\Crashpad\reports',
+]
+processes = ["code.exe"]
+
+[[target]]
+id = "zoom"
+name = "Zoom"
+group = "Applications"
+level = "safe"
+paths = ['%APPDATA%\Zoom\logs']
+processes = ["zoom.exe"]
+
+[[target]]
+id = "steam"
+name = "Steam"
+group = "Applications"
+level = "safe"
+description = "Web cache, logs and crash dumps. Games and settings are not touched."
+paths = [
+  '%ProgramFiles(x86)%\Steam\appcache\httpcache',
+  '%ProgramFiles(x86)%\Steam\logs',
+  '%ProgramFiles(x86)%\Steam\dumps',
+  '%LOCALAPPDATA%\Steam\htmlcache',
+]
+processes = ["steam.exe"]
+
+[[target]]
+id = "epic"
+name = "Epic Games Launcher"
+group = "Applications"
+level = "safe"
+paths = ['%LOCALAPPDATA%\EpicGamesLauncher\Saved\webcache*', '%LOCALAPPDATA%\EpicGamesLauncher\Saved\Logs']
+processes = ["epicgameslauncher.exe"]
+
+[[target]]
+id = "battlenet"
+name = "Battle.net"
+group = "Applications"
+level = "safe"
+paths = ['%LOCALAPPDATA%\Battle.net\Cache', '%LOCALAPPDATA%\Battle.net\BrowserCache', '%LOCALAPPDATA%\Battle.net\Logs']
+processes = ["battle.net.exe"]
+
+[[target]]
+id = "java"
+name = "Java cache"
+group = "Applications"
+level = "safe"
+paths = ['%USERPROFILE%\AppData\LocalLow\Sun\Java\Deployment\cache']
+
+[[target]]
+id = "adobe-media-cache"
+name = "Adobe media cache"
+group = "Applications"
+level = "recommended"
+description = "Premiere Pro / After Effects media cache. Rebuilt when projects are opened."
+paths = ['%APPDATA%\Adobe\Common\Media Cache Files', '%APPDATA%\Adobe\Common\Media Cache', '%APPDATA%\Adobe\Common\Peak Files']
+processes = ["adobe premiere pro.exe", "afterfx.exe", "adobe media encoder.exe"]
+
+[[target]]
+id = "onedrive-logs"
+name = "OneDrive logs"
+group = "Applications"
+level = "safe"
+paths = ['%LOCALAPPDATA%\Microsoft\OneDrive\logs']
+min_age_hours = 168
+
+# ────────────────────────────── Developer ─────────────────────────────
+
+[[target]]
+id = "pip-cache"
+name = "pip cache"
+group = "Developer"
+level = "recommended"
+default_on = false
+paths = ['%LOCALAPPDATA%\pip\cache']
+
+[[target]]
+id = "npm-cache"
+name = "npm cache"
+group = "Developer"
+level = "recommended"
+default_on = false
+paths = ['%LOCALAPPDATA%\npm-cache', '%APPDATA%\npm-cache']
+
+[[target]]
+id = "yarn-cache"
+name = "Yarn cache"
+group = "Developer"
+level = "recommended"
+default_on = false
+paths = ['%LOCALAPPDATA%\Yarn\Cache']
+
+[[target]]
+id = "nuget-cache"
+name = "NuGet HTTP cache"
+group = "Developer"
+level = "recommended"
+default_on = false
+paths = ['%LOCALAPPDATA%\NuGet\v3-cache', '%LOCALAPPDATA%\NuGet\plugins-cache']
+
+[[target]]
+id = "gradle-cache"
+name = "Gradle caches"
+group = "Developer"
+level = "recommended"
+default_on = false
+description = "Downloaded dependencies and build caches. The next build downloads them again."
+paths = ['%USERPROFILE%\.gradle\caches']
+processes = ["java.exe"]
+
+[[target]]
+id = "go-cache"
+name = "Go build cache"
+group = "Developer"
+level = "recommended"
+default_on = false
+paths = ['%LOCALAPPDATA%\go-build']
+
+[[target]]
+id = "cargo-cache"
+name = "Cargo registry cache"
+group = "Developer"
+level = "recommended"
+default_on = false
+description = "Downloaded crate archives (extracted sources are kept)."
+paths = ['%USERPROFILE%\.cargo\registry\cache']
+
+# ───────────────────────────── Deep Clean ─────────────────────────────
+
+[[target]]
+id = "app-caches"
+name = "Other app caches (auto-detected)"
+group = "Deep Clean"
+level = "recommended"
+description = "Chromium, Electron and WebView2 caches of any other app under AppData."
+resolver = "app-caches"
+
+[[target]]
+id = "crash-reports"
+name = "App crash reports"
+group = "Deep Clean"
+level = "safe"
+paths = [
+  '%LOCALAPPDATA%\*\Crashpad\reports',
+  '%LOCALAPPDATA%\*\*\Crashpad\reports',
+  '%APPDATA%\*\Crashpad\reports',
+  '%LOCALAPPDATA%\*\CrashReports',
+  '%LOCALAPPDATA%\*\*\CrashReports',
+  '%LOCALAPPDATA%\CrashReportClient',
+]
+
+[[target]]
+id = "old-temp-files"
+name = "Stray temporary files"
+group = "Deep Clean"
+level = "recommended"
+description = "*.tmp files older than 7 days left behind anywhere in AppData. App databases are skipped."
+paths = ['%LOCALAPPDATA%', '%APPDATA%', '%USERPROFILE%\AppData\LocalLow']
+include = ["*.tmp", "*.temp", "*._mp", "~*.tmp"]
+exclude_paths = ['%LOCALAPPDATA%\Temp', '%LOCALAPPDATA%\Packages']
+min_age_hours = 168
+skip_markers = true
+
+[[target]]
+id = "old-log-files"
+name = "Old log files"
+group = "Deep Clean"
+level = "recommended"
+description = "App log files untouched for 14 days. Database transaction logs are never touched."
+paths = ['%LOCALAPPDATA%', '%APPDATA%', '%USERPROFILE%\AppData\LocalLow']
+include = ["*.log", "*.log.old", "*.log.bak", "*.log.?"]
+exclude = ["edb*.log", "v01*.log", "res*.log", "*.jrs"]
+exclude_paths = ['%LOCALAPPDATA%\Temp', '%LOCALAPPDATA%\Packages', '%LOCALAPPDATA%\Microsoft\Windows\WebCache']
+min_age_hours = 336
+skip_markers = true
+
+[[target]]
+id = "empty-folders"
+name = "Empty folders"
+group = "Deep Clean"
+level = "expert"
+description = "Empty folders in AppData untouched for 30 days. Windows and Store app folders are skipped."
+paths = ['%LOCALAPPDATA%', '%APPDATA%']
+exclude_paths = ['%LOCALAPPDATA%\Microsoft', '%APPDATA%\Microsoft', '%LOCALAPPDATA%\Packages', '%LOCALAPPDATA%\Programs', '%LOCALAPPDATA%\Temp']
+empty_dirs = true
+min_age_hours = 720
+
+# ─────────────────────────────── Privacy ──────────────────────────────
+
+[[target]]
+id = "explorer-mru"
+name = "Run, address bar & search history"
+group = "Privacy"
+level = "recommended"
+default_on = false
+description = "Win+R history, typed Explorer paths and Explorer search history."
+special = "explorer-mru"
+
+[[target]]
+id = "recent-items"
+name = "Recent items"
+group = "Privacy"
+level = "recommended"
+default_on = false
+description = "Recently opened file shortcuts. Pinned Jump List items are kept."
+paths = ['%APPDATA%\Microsoft\Windows\Recent']
+include = ["*.lnk"]
+recursive = false
+
+[[target]]
+id = "firefox-cookies"
+name = "Mozilla Firefox cookies"
+group = "Privacy"
+level = "expert"
+description = "Signs you out of websites."
+paths = ['%APPDATA%\Mozilla\Firefox\Profiles\*\cookies.sqlite', '%APPDATA%\Mozilla\Firefox\Profiles\*\cookies.sqlite-wal']
+processes = ["firefox.exe"]
+
+# ─────────────────────────────── Advanced ─────────────────────────────
+
+[[target]]
+id = "windows-old"
+name = "Previous Windows installation"
+group = "Advanced"
+level = "expert"
+admin = true
+description = "Windows.old. Frees a lot of space after an upgrade, but you can no longer roll back."
+paths = ['%SystemDrive%\Windows.old']
+special = "cleanmgr"
+cleanmgr = ["Previous Installations"]
+
+[[target]]
+id = "component-store"
+name = "Windows component store cleanup"
+group = "Advanced"
+level = "expert"
+admin = true
+description = "Removes superseded Windows component versions (DISM). Takes several minutes."
+special = "dism"
+
+[[target]]
+id = "old-drivers"
+name = "Old driver versions"
+group = "Advanced"
+level = "expert"
+admin = true
+description = "Older copies of third-party drivers in the driver store. The newest version is kept; drivers in use are never removed."
+special = "old-drivers"
+
+[[target]]
+id = "installer-orphans"
+name = "Orphaned installer packages"
+group = "Advanced"
+level = "expert"
+admin = true
+description = ".msi/.msp files in C:\\Windows\\Installer that no installed program references."
+special = "installer-orphans"
+
+[[target]]
+id = "restore-points"
+name = "Old restore points"
+group = "Advanced"
+level = "expert"
+admin = true
+description = "Deletes every System Restore point except the newest one."
+special = "restore-points"
+
+[[target]]
+id = "event-logs"
+name = "Windows event logs"
+group = "Advanced"
+level = "expert"
+admin = true
+description = "Clears every event log. Only do this if you don't need them for troubleshooting."
+special = "event-logs"
+
+[[target]]
+id = "prefetch"
+name = "Prefetch data"
+group = "Advanced"
+level = "expert"
+admin = true
+description = "Not recommended: Windows uses these files to start apps faster. They are rebuilt over time."
+paths = ['%SystemRoot%\Prefetch']
+include = ["*.pf"]
+
+# ──────────────────────────── Chromium family ─────────────────────────
+
+[[chromium]]
+id = "chrome"
+name = "Google Chrome"
+process = "chrome.exe"
+user_data = [
+  '%LOCALAPPDATA%\Google\Chrome\User Data',
+  '%LOCALAPPDATA%\Google\Chrome Beta\User Data',
+  '%LOCALAPPDATA%\Google\Chrome Dev\User Data',
+  '%LOCALAPPDATA%\Google\Chrome SxS\User Data',
+]
+
+[[chromium]]
+id = "edge"
+name = "Microsoft Edge"
+process = "msedge.exe"
+user_data = [
+  '%LOCALAPPDATA%\Microsoft\Edge\User Data',
+  '%LOCALAPPDATA%\Microsoft\Edge Beta\User Data',
+  '%LOCALAPPDATA%\Microsoft\Edge Dev\User Data',
+  '%LOCALAPPDATA%\Microsoft\Edge SxS\User Data',
+]
+
+[[chromium]]
+id = "brave"
+name = "Brave"
+process = "brave.exe"
+user_data = [
+  '%LOCALAPPDATA%\BraveSoftware\Brave-Browser\User Data',
+  '%LOCALAPPDATA%\BraveSoftware\Brave-Browser-Beta\User Data',
+  '%LOCALAPPDATA%\BraveSoftware\Brave-Browser-Nightly\User Data',
+]
+
+[[chromium]]
+id = "vivaldi"
+name = "Vivaldi"
+process = "vivaldi.exe"
+user_data = ['%LOCALAPPDATA%\Vivaldi\User Data']
+
+[[chromium]]
+id = "opera"
+name = "Opera"
+process = "opera.exe"
+user_data = ['%APPDATA%\Opera Software\Opera Stable', '%LOCALAPPDATA%\Opera Software\Opera Stable']
+
+[[chromium]]
+id = "opera-gx"
+name = "Opera GX"
+process = "opera.exe"
+user_data = ['%APPDATA%\Opera Software\Opera GX Stable', '%LOCALAPPDATA%\Opera Software\Opera GX Stable']
+
+[[chromium]]
+id = "chromium"
+name = "Chromium"
+process = "chrome.exe"
+user_data = ['%LOCALAPPDATA%\Chromium\User Data']
+
+[[chromium]]
+id = "yandex"
+name = "Yandex Browser"
+process = "browser.exe"
+user_data = ['%LOCALAPPDATA%\Yandex\YandexBrowser\User Data']
+
+[[chromium]]
+id = "arc"
+name = "Arc"
+process = "arc.exe"
+user_data = ['%LOCALAPPDATA%\Packages\TheBrowserCompany.Arc_*\LocalCache\Local\Arc\User Data']
+
+[[chromium]]
+id = "thorium"
+name = "Thorium"
+process = "thorium.exe"
+user_data = ['%LOCALAPPDATA%\Thorium\User Data']
