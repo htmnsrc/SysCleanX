@@ -26,4 +26,4 @@ pub mod util;
 
 pub use engine::{CleanReport, Engine, Options, TargetScan};
 pub use progress::Progress;
-pub use util::format_bytes;
+pub use util::{format_bytes, format_count};

@@ -12,6 +12,10 @@ use std::path::Path;
 pub struct Guard {
     protected: Vec<String>,
     sealed: Vec<String>,
+    /// Windows folder (manual deletion never reaches inside it).
+    system_root: Option<String>,
+    /// Program Files, ProgramData, per-user Programs: manual deletion warns here.
+    program_dirs: Vec<String>,
 }
 
 /// Well-known user folders that are sealed for every profile under `X:\Users\*`.
@@ -22,7 +26,14 @@ const SEALED_PROFILE_DIRS: &[&str] = &[
 
 impl Guard {
     pub fn new(protected: Vec<String>, sealed: Vec<String>) -> Self {
-        Guard { protected, sealed }
+        Guard { protected, sealed, system_root: None, program_dirs: Vec::new() }
+    }
+
+    /// Set the folders used by the manual-deletion rules.
+    pub fn with_manual(mut self, system_root: Option<String>, program_dirs: Vec<String>) -> Self {
+        self.system_root = system_root;
+        self.program_dirs = program_dirs;
+        self
     }
 
     /// Guard built from the current Windows environment.
@@ -90,7 +101,9 @@ impl Guard {
         protected.dedup();
         sealed.sort();
         sealed.dedup();
-        Guard { protected, sealed }
+        let system_root = keys(&["%SystemRoot%"]).into_iter().next();
+        let program_dirs = keys(&["%ProgramFiles%", "%ProgramFiles(x86)%", "%ProgramW6432%", "%ProgramData%", "%LOCALAPPDATA%\\Programs"]);
+        Guard { protected, sealed, system_root, program_dirs }
     }
 
     /// True if nothing at or below this normalized key may be deleted.
@@ -136,6 +149,70 @@ impl Guard {
         Ok(())
     }
 
+    /// Rules for deletions the user picks by hand (Disk usage). Much wider than automatic
+    /// cleaning (your own files anywhere are fine; they go to the Recycle Bin), but Windows
+    /// itself and folders it depends on are refused. `Ok(Some(warning))` means allowed but
+    /// worth a warning.
+    pub fn check_manual(&self, path: &Path) -> Result<Option<&'static str>, String> {
+        if !path.is_absolute() {
+            return Err("Only full paths can be deleted.".into());
+        }
+        self.manual_rule(&norm_key(path))
+    }
+
+    pub fn manual_rule(&self, key: &str) -> Result<Option<&'static str>, String> {
+        const ROOT_FILES: &[&str] = &["pagefile.sys", "hiberfil.sys", "swapfile.sys", "dumpstack.log", "dumpstack.log.tmp", "bootmgr", "bootnxt"];
+        const SYSTEM_TOP: &[&str] = &["system volume information", "recovery", "boot", "efi", "config.msi", "windows.old"];
+        if key.starts_with("//") {
+            return Err("Network locations can't be deleted from here.".into());
+        }
+        let parts: Vec<&str> = key.split('/').filter(|s| !s.is_empty()).collect();
+        if parts.len() <= 1 {
+            return Err("A whole drive can't be deleted.".into());
+        }
+        if self.protected.iter().any(|p| key_within(p, key)) {
+            return Err("Windows needs this folder, so it can't be deleted.".into());
+        }
+        if let Some(root) = &self.system_root {
+            if key_within(key, root) {
+                return Err("Files inside the Windows folder are managed by Windows.".into());
+            }
+        }
+        let top = parts[1];
+        if top.starts_with('$') || SYSTEM_TOP.contains(&top) {
+            return Err(if top == "windows.old" {
+                "Remove the previous Windows installation from Clean → Advanced instead.".into()
+            } else {
+                "This is a hidden Windows system folder.".into()
+            });
+        }
+        if parts.len() == 2 && ROOT_FILES.contains(&top) {
+            return Err(if top == "hiberfil.sys" {
+                "Turn hibernation off in Tools → Repair to remove this file.".into()
+            } else {
+                "This file is managed by Windows.".into()
+            });
+        }
+        if (top == "programdata" && parts.get(2) == Some(&"microsoft")) || parts.get(2) == Some(&"windowsapps") {
+            return Err("This folder is managed by Windows.".into());
+        }
+        if top == "users" {
+            if parts.len() == 3 {
+                return Err("A whole user profile can't be deleted from here.".into());
+            }
+            if parts.len() == 4 && (SEALED_PROFILE_DIRS.contains(&parts[3]) || parts[3].starts_with("onedrive")) {
+                return Err("Windows needs this folder. Open it and delete what's inside instead.".into());
+            }
+            if parts.get(3) == Some(&"appdata") {
+                return Ok(Some("Apps keep their data here. Deleting it can reset or break the app that owns it."));
+            }
+        }
+        if self.program_dirs.iter().any(|d| key_within(key, d)) {
+            return Ok(Some("This belongs to an installed program. Uninstalling it from Apps → Programs is safer than deleting its files."));
+        }
+        Ok(None)
+    }
+
     /// Ok if the engine may purge inside `path`. `filtered` purges (name patterns,
     /// never removing folders) may run inside protected folders; full purges may not.
     pub fn check_purge(&self, path: &Path, filtered: bool) -> Result<(), String> {
@@ -150,6 +227,29 @@ impl Guard {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manual_deletion_rules() {
+        let g = Guard::new(
+            vec!["c:/windows".into(), "c:/program files".into(), "c:/programdata".into(), "c:/users".into(), "c:/users/bob".into()],
+            vec![],
+        )
+        .with_manual(Some("c:/windows".into()), vec!["c:/program files".into(), "c:/programdata".into()]);
+        let blocked = [
+            "c:/", "c:/windows", "c:/windows/temp/x.log", "c:/program files", "c:/users", "c:/users/bob", "c:/users/amy",
+            "c:/users/bob/documents", "c:/users/bob/onedrive - work", "c:/pagefile.sys", "c:/hiberfil.sys",
+            "c:/$recycle.bin/s-1-5/x", "c:/system volume information", "c:/programdata/microsoft/windows defender",
+            "c:/program files/windowsapps/x", "c:/windows.old", "//server/share/x",
+        ];
+        for k in blocked {
+            assert!(g.manual_rule(k).is_err(), "{k} must be blocked");
+        }
+        assert_eq!(g.manual_rule("c:/users/bob/documents/holiday.mp4"), Ok(None));
+        assert_eq!(g.manual_rule("c:/users/bob/downloads/old-installers"), Ok(None));
+        assert_eq!(g.manual_rule("d:/games/old game"), Ok(None));
+        assert!(matches!(g.manual_rule("c:/program files/someapp"), Ok(Some(_))));
+        assert!(matches!(g.manual_rule("c:/users/bob/appdata/local/someapp"), Ok(Some(_))));
+    }
 
     #[test]
     fn blocks_dangerous_paths() {

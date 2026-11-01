@@ -24,6 +24,23 @@ impl Repair {
         Repair { findings: None, scan_job: None, fix_job: None, hiber_job: None, hiberfil: None, hiber_pending: None, confirm: false }
     }
 
+    /// Debug builds only: sample findings for UI screenshots.
+    #[cfg(debug_assertions)]
+    pub fn demo(&mut self) {
+        let f = |kind, title: &str, detail: &str, checked| Finding::new(kind, title.into(), detail.into(), String::new(), checked);
+        let mut appdata = f(FindingKind::AppData, "OldEditor", "No installed program matches this folder", false);
+        appdata.size = 1_503_238_553;
+        self.findings = Some(vec![
+            f(FindingKind::Shortcut, "Photoshop CS6", "Points to missing C:\\Program Files\\Adobe\\Photoshop CS6\\Photoshop.exe", true),
+            f(FindingKind::Shortcut, "Old Racing Game", "Points to missing D:\\Games\\OldRacing\\game.exe", true),
+            f(FindingKind::StartupEntry, "OldUpdater", "\"C:\\Program Files\\Gone\\updater.exe\" --background", true),
+            f(FindingKind::UninstallEntry, "Some Tool 1.2", "Uninstaller missing: C:\\Program Files\\SomeTool\\unins000.exe", true),
+            f(FindingKind::Task, "LegacyAppUpdate", "\"C:\\Program Files (x86)\\Legacy\\update.exe\" /silent", true),
+            appdata,
+        ]);
+        self.hiberfil = Some(Some(13_743_895_347));
+    }
+
     fn busy(&self) -> bool {
         self.scan_job.is_some() || self.fix_job.is_some()
     }

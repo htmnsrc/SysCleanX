@@ -54,7 +54,7 @@ pub struct Finding {
 }
 
 impl Finding {
-    fn new(kind: Kind, title: String, detail: String, target: String, checked: bool) -> Self {
+    pub fn new(kind: Kind, title: String, detail: String, target: String, checked: bool) -> Self {
         Finding { kind, title, detail, target, size: 0, checked, startup: None }
     }
 }
@@ -300,7 +300,7 @@ fn orphaned_appdata(apps: &[App], startup_items: &[StartupItem], progress: &Prog
             let mut f = Finding::new(
                 Kind::AppData,
                 name,
-                format!("No installed program matches this folder ({})", crate::util::format_bytes(size)),
+                "No installed program matches this folder".into(),
                 e.path().display().to_string(),
                 false,
             );

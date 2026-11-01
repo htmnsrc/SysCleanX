@@ -20,6 +20,19 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
+/// "968,003" style counts.
+pub fn format_count(n: u64) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Case-insensitive wildcard match supporting `*` and `?`.
 pub fn wildcard_match(pattern: &str, text: &str) -> bool {
     let p: Vec<char> = pattern.chars().flat_map(char::to_lowercase).collect();
@@ -224,6 +237,10 @@ mod tests {
         assert_eq!(format_bytes(1536), "1.5 KB");
         assert_eq!(format_bytes(412 << 30), "412 GB");
         assert_eq!(format_bytes(6_920_000_000), "6.4 GB");
+        assert_eq!(format_count(999), "999");
+        assert_eq!(format_count(1_000), "1,000");
+        assert_eq!(format_count(968_003), "968,003");
+        assert_eq!(format_count(12_345_678), "12,345,678");
     }
 
     #[test]

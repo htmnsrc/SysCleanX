@@ -1,6 +1,7 @@
-// Embed the app icon and version info into the Windows executable.
+// Embed the app icon, version info and manifest (run as administrator) into the Windows exe.
 fn main() {
     println!("cargo:rerun-if-changed=assets/icon.ico");
+    println!("cargo:rerun-if-changed=assets/app.manifest");
     #[cfg(windows)]
     windows_resources();
     #[cfg(not(windows))]
@@ -13,6 +14,7 @@ fn main() {
 fn windows_resources() {
     let mut res = winresource::WindowsResource::new();
     res.set_icon("assets/icon.ico")
+        .set_manifest_file("assets/app.manifest")
         .set("ProductName", "SysCleanX")
         .set("FileDescription", "SysCleanX")
         .set("CompanyName", "Hitman")
@@ -29,12 +31,14 @@ fn cross_resources() {
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let rc = out.join("app.rc");
     let icon = std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("assets/icon.ico");
+    let manifest = std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("assets/app.manifest");
     let v = |k: &str| std::env::var(k).unwrap_or_else(|_| "0".into());
     let (major, minor, patch) = (v("CARGO_PKG_VERSION_MAJOR"), v("CARGO_PKG_VERSION_MINOR"), v("CARGO_PKG_VERSION_PATCH"));
     let version = v("CARGO_PKG_VERSION");
     // Icon + version details (shown in file Properties and Task Manager).
     let script = format!(
         r#"1 ICON "{icon}"
+1 24 "{manifest}"
 1 VERSIONINFO
 FILEVERSION {major},{minor},{patch},0
 PRODUCTVERSION {major},{minor},{patch},0
@@ -61,7 +65,8 @@ BEGIN
   END
 END
 "#,
-        icon = icon.display().to_string().replace('\\', "/")
+        icon = icon.display().to_string().replace('\\', "/"),
+        manifest = manifest.display().to_string().replace('\\', "/")
     );
     std::fs::write(&rc, script).unwrap();
     let obj = out.join("app_res.o");

@@ -3,10 +3,14 @@ use crate::shared::Shared;
 use crate::theme::{self, badge, card, muted, pill, pill_sized, semibold, Kind};
 use eframe::egui::{self, collapsing_header::CollapsingState, Align, Id, Layout, RichText, Vec2};
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use syscleanx_core::engine::Options;
+use syscleanx_core::sys::Stopped;
 use syscleanx_core::log::DeletionLog;
 use syscleanx_core::targets::{groups, Level, Special, Target};
-use syscleanx_core::{format_bytes, settings, sys, CleanReport, TargetScan};
+use syscleanx_core::{format_bytes, format_count, settings, sys, CleanReport, TargetScan};
 
 /// Specials that are slow to measure; only scanned once the user selects them.
 fn is_slow(t: &Target) -> bool {
@@ -27,9 +31,21 @@ fn group_blurb(name: &str, rows: &[&Target]) -> String {
     }
 }
 
+/// Windows normally needs well under a minute; give up (and offer to continue) after this.
+const RESTORE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
 enum CleanOutcome {
     Done(CleanReport),
     RestoreFailed(String),
+    /// Cancelled before anything was deleted.
+    Cancelled,
+}
+
+/// Lets the UI skip a slow restore point without cancelling the clean.
+#[derive(Default)]
+struct RestoreCtl {
+    active: AtomicBool,
+    skip: AtomicBool,
 }
 
 pub struct Cleaner {
@@ -46,6 +62,9 @@ pub struct Cleaner {
     restore_error: Option<String>,
     scan_stopped: bool,
     started: bool,
+    restore_ctl: Arc<RestoreCtl>,
+    /// The user picked "Custom" (kept until they pick Safe or Recommended).
+    custom_mode: bool,
 }
 
 impl Cleaner {
@@ -67,6 +86,8 @@ impl Cleaner {
             restore_error: None,
             scan_stopped: false,
             started: false,
+            restore_ctl: Arc::new(RestoreCtl::default()),
+            custom_mode: false,
         }
     }
 
@@ -141,11 +162,15 @@ impl Cleaner {
     fn preset(&mut self, shared: &mut Shared, pick: impl Fn(&Target) -> bool) {
         self.selected = shared.engine.targets.iter().filter(|t| pick(t)).map(|t| t.id.clone()).collect();
         self.overrides.clear();
+        self.custom_mode = false;
         self.persist(shared);
     }
 
     /// 0 = Safe, 1 = Recommended, 2 = Custom.
     fn current_preset(&self, shared: &Shared) -> usize {
+        if self.custom_mode {
+            return 2;
+        }
         let pick = |f: &dyn Fn(&Target) -> bool| -> HashSet<String> {
             shared.engine.targets.iter().filter(|t| f(t)).map(|t| t.id.clone()).collect()
         };
@@ -189,11 +214,30 @@ impl Cleaner {
             skip_running: true,
             force: self.overrides.iter().cloned().collect(),
         };
+        let ctl = self.restore_ctl.clone();
+        ctl.skip.store(false, Ordering::Relaxed);
         self.clean_job = Some(Job::spawn(ctx, move |p| {
             if restore {
-                p.set_label("Creating a restore point — this can take a minute…");
-                if let Err(e) = sys::create_restore_point("SysCleanX") {
-                    return CleanOutcome::RestoreFailed(e);
+                ctl.active.store(true, Ordering::Relaxed);
+                let start = Instant::now();
+                let result = sys::create_restore_point("SysCleanX", RESTORE_TIMEOUT, || {
+                    let s = start.elapsed().as_secs();
+                    p.set_label(format!("Creating a restore point… {}:{:02}  ·  Windows can take a few minutes", s / 60, s % 60));
+                    !p.is_cancelled() && !ctl.skip.load(Ordering::Relaxed)
+                });
+                ctl.active.store(false, Ordering::Relaxed);
+                match result {
+                    Ok(()) => {}
+                    // Stopped by "Skip restore point": carry on cleaning without one.
+                    Err(Stopped::Cancelled) if !p.is_cancelled() => {}
+                    Err(Stopped::Cancelled) => return CleanOutcome::Cancelled,
+                    Err(Stopped::TimedOut) => {
+                        return CleanOutcome::RestoreFailed(format!(
+                            "Windows didn't finish creating the restore point within {} minutes. It may be busy, for example installing updates.",
+                            RESTORE_TIMEOUT.as_secs() / 60
+                        ))
+                    }
+                    Err(Stopped::Failed(e)) => return CleanOutcome::RestoreFailed(e),
                 }
             }
             let log = DeletionLog::create(&settings::logs_dir(), "clean");
@@ -232,8 +276,12 @@ impl Cleaner {
                 Ok(CleanOutcome::Done(report)) => {
                     let skipped = report.results.iter().any(|r| r.error.is_some()) || report.total().skipped > 0;
                     let freed = report.total().bytes;
-                    shared.record_clean(freed);
-                    if skipped {
+                    if freed > 0 || !report.cancelled {
+                        shared.record_clean(freed);
+                    }
+                    if report.cancelled {
+                        shared.notify(format!("Stopped. Freed {} before you cancelled.", format_bytes(freed)));
+                    } else if skipped {
                         shared.notify(format!("Freed {}. Some items were skipped — see Details.", format_bytes(freed)));
                     } else {
                         shared.notify(format!("Freed {}.", format_bytes(freed)));
@@ -243,6 +291,7 @@ impl Cleaner {
                     self.start_scan(ctx, shared, None);
                 }
                 Ok(CleanOutcome::RestoreFailed(e)) => self.restore_error = Some(e),
+                Ok(CleanOutcome::Cancelled) => shared.notify("Cancelled. Nothing was deleted."),
                 Err(e) => shared.error(e),
             }
         }
@@ -266,7 +315,9 @@ impl Cleaner {
                         0 => self.preset(shared, |t| t.level == Level::Safe),
                         1 => self.preset(shared, |t| t.is_default_on()),
                         _ => {
-                            // "Custom" opens every category so items can be picked by hand.
+                            // "Custom" stays selected and opens every category so items can be
+                            // picked by hand.
+                            self.custom_mode = true;
                             for g in groups(&engine.targets) {
                                 let mut s = CollapsingState::load_with_default_open(&ctx, Id::unique(("cleaner-group", g.as_str())), false);
                                 s.set_open(true);
@@ -338,7 +389,10 @@ impl Cleaner {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    if let Some(job) = &self.clean_job {
+                    if self.clean_job.is_some() && self.restore_ctl.active.load(Ordering::Relaxed) {
+                        ui.label(RichText::new("Creating restore point…").font(semibold(32.0)).color(p.accent));
+                        ui.label(muted(&p, "Nothing is deleted until it's ready. You can skip it or cancel."));
+                    } else if let Some(job) = &self.clean_job {
                         ui.label(RichText::new("Cleaning…").font(semibold(32.0)).color(p.accent));
                         ui.label(muted(&p, format!("{} removed so far", format_bytes(job.progress.bytes()))));
                     } else if self.scan.is_none() {
@@ -371,7 +425,11 @@ impl Cleaner {
             let progress = self.clean_job.as_ref().map(|j| j.progress.clone()).or_else(|| self.scan_job.as_ref().map(|j| j.progress.clone()));
             ui.add_space(14.0);
             if let Some(pr) = progress {
-                theme::progress_row(ui, &p, &pr, false);
+                let restoring = self.clean_job.is_some() && self.restore_ctl.active.load(Ordering::Relaxed);
+                let (_, skip) = theme::progress_row_ext(ui, &p, &pr, false, restoring.then_some("Skip restore point"));
+                if skip {
+                    self.restore_ctl.skip.store(true, Ordering::Relaxed);
+                }
             } else if let Some(d) = shared.drive.clone() {
                 theme::drive_bar(ui, &p, d.total, d.free, selected_bytes);
                 ui.add_space(2.0);
@@ -555,7 +613,7 @@ impl Cleaner {
             if let Some(s) = &s {
                 if s.files > 0 {
                     let unit = if t.special.is_some() { "items" } else { "files" };
-                    ui.label(format!("{} {unit} · {}", s.files, format_bytes(s.bytes)));
+                    ui.label(format!("{} {unit} · {}", format_count(s.files), format_bytes(s.bytes)));
                 }
                 if let Some(note) = &s.note {
                     ui.label(muted(&p, note));
@@ -660,7 +718,7 @@ impl Cleaner {
             ui.set_width(480.0);
             theme::modal_title(ui, if report.cancelled { "Cleaning stopped" } else { "Cleaning complete" });
             ui.label(RichText::new(format!("{} freed", format_bytes(total.bytes))).font(semibold(28.0)).color(p.green));
-            let mut line = format!("{} files removed", total.files);
+            let mut line = format!("{} files removed", format_count(total.files));
             if total.skipped > 0 {
                 line.push_str(&format!(" · {} in use and skipped", total.skipped));
             }

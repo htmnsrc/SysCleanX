@@ -4,7 +4,7 @@ use crate::theme::{self, badge, card, muted, pill, semibold, Kind};
 use eframe::egui::{self, collapsing_header::CollapsingState, Id, RichText};
 use std::collections::HashSet;
 use syscleanx_core::bloat::{self, AppxPackage, Category};
-use syscleanx_core::sys;
+use syscleanx_core::sys::{self, Stopped};
 
 type RemoveResult = Result<Vec<(String, String)>, String>;
 
@@ -47,7 +47,7 @@ impl Debloat {
             let (category, protected, friendly) = bloat::classify(n, false);
             self.pkgs.push(AppxPackage { name: n.into(), full_name: format!("{n}_1.0_x64"), version: "1.0.0.0".into(), category, protected, friendly });
         }
-        self.pkgs.sort_by(|a, b| a.category.cmp(&b.category));
+        self.pkgs.sort_by_key(|p| p.category);
         self.selected = self.pkgs.iter().filter(|p| p.category == Category::Bloat).map(|p| p.full_name.clone()).collect();
     }
 
@@ -194,15 +194,36 @@ impl Debloat {
                 let restore = shared.settings.restore_point && shared.admin;
                 self.remove_job = Some(Job::spawn(&ctx, move |pr| {
                     if restore {
-                        pr.set_label("Creating a restore point — this can take a minute…");
-                        if let Err(e) = sys::create_restore_point("SysCleanX debloat") {
-                            return Err(format!(
-                                "A restore point could not be created, so nothing was removed. Turn off \"Restore point first\" to continue.\n{e}"
-                            ));
+                        let start = std::time::Instant::now();
+                        let result = sys::create_restore_point("SysCleanX debloat", std::time::Duration::from_secs(300), || {
+                            let s = start.elapsed().as_secs();
+                            pr.set_label(format!("Creating a restore point… {}:{:02}  ·  Windows can take a few minutes", s / 60, s % 60));
+                            !pr.is_cancelled()
+                        });
+                        match result {
+                            Ok(()) => {}
+                            Err(Stopped::Cancelled) => return Err("Cancelled. Nothing was removed.".into()),
+                            Err(Stopped::TimedOut) => {
+                                return Err("Windows didn't finish creating the restore point within 5 minutes, so nothing was removed. Turn off \"Restore point first\" to continue without one.".into())
+                            }
+                            Err(Stopped::Failed(e)) => {
+                                return Err(format!(
+                                    "A restore point could not be created, so nothing was removed. Turn off \"Restore point first\" to continue.\n{e}"
+                                ))
+                            }
                         }
                     }
-                    pr.set_label("Removing apps…");
-                    Ok(bloat::remove(&pkgs, deprovision))
+                    // One app at a time so Cancel takes effect between apps.
+                    let mut errors = Vec::new();
+                    for (i, pkg) in pkgs.iter().enumerate() {
+                        if pr.is_cancelled() {
+                            errors.push(("Stopped".to_string(), format!("{} app(s) were not removed", pkgs.len() - i)));
+                            break;
+                        }
+                        pr.set_label(format!("Removing {}…", pkg.friendly));
+                        errors.extend(bloat::remove(std::slice::from_ref(pkg), deprovision));
+                    }
+                    Ok(errors)
                 }));
             } else if cancel || resp.should_close() {
                 self.confirm = false;

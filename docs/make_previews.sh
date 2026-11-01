@@ -27,6 +27,9 @@ shot clean-light clean '{"light_theme": true, "accent": 1}'
 shot apps apps ""
 shot store store ""
 shot startup startup ""
+shot repair repair ""
+shot disk disk ""
+shot duplicates duplicates ""
 shot settings settings ""
 
 python3 docs/make_previews.py "$RAW" docs

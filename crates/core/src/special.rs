@@ -262,7 +262,7 @@ mod restore_points {
         let used = v["Used"].as_u64().unwrap_or(0);
         let deletable = count.saturating_sub(1);
         Ok(SpecialScan {
-            bytes: if count > 0 { used / count * deletable } else { 0 },
+            bytes: used.checked_div(count).unwrap_or(0) * deletable,
             count: deletable,
             size_known: false,
             present: deletable > 0,

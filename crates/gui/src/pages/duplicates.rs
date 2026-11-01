@@ -30,6 +30,39 @@ impl Duplicates {
         Duplicates { folders, min_mb: 1, groups: None, job: None, delete_job: None, selected: HashSet::new(), confirm: false }
     }
 
+    /// Debug builds only: sample results for UI screenshots.
+    #[cfg(debug_assertions)]
+    pub fn demo(&mut self) {
+        use std::time::{Duration, SystemTime};
+        use syscleanx_core::duplicates::DupFile;
+        let ago = |days: u64| Some(SystemTime::now() - Duration::from_secs(days * 86_400));
+        let file = |p: &str, days| DupFile { path: PathBuf::from(p), modified: ago(days) };
+        self.folders = ["Desktop", "Documents", "Downloads", "Pictures", "Videos"]
+            .iter()
+            .map(|f| format!("C:\\Users\\demo\\{f}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        self.groups = Some(vec![
+            DupGroup {
+                size: 1_288_490_189,
+                files: vec![file("C:\\Users\\demo\\Videos\\Project final.mp4", 40), file("C:\\Users\\demo\\Downloads\\Project final (1).mp4", 12)],
+            },
+            DupGroup {
+                size: 314_572_800,
+                files: vec![file("C:\\Users\\demo\\Downloads\\setup.exe", 90), file("C:\\Users\\demo\\Desktop\\setup.exe", 30)],
+            },
+            DupGroup {
+                size: 8_388_608,
+                files: vec![
+                    file("C:\\Users\\demo\\Pictures\\IMG_2041.jpg", 200),
+                    file("C:\\Users\\demo\\Desktop\\IMG_2041.jpg", 150),
+                    file("C:\\Users\\demo\\Downloads\\IMG_2041 copy.jpg", 7),
+                ],
+            },
+        ]);
+        self.select_all_but(true);
+    }
+
     fn busy(&self) -> bool {
         self.job.is_some() || self.delete_job.is_some()
     }

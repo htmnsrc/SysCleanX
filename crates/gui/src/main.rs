@@ -12,8 +12,8 @@ use eframe::egui;
 fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().collect();
     let skip_elevation = args.iter().any(|a| a == "--elevated" || a == "--no-elevate");
-    // Like v1, ask for admin rights up front; if the user declines UAC we continue in
-    // limited mode (system targets are shown as "needs admin").
+    // The embedded manifest (assets/app.manifest) makes Windows start SysCleanX as
+    // administrator. This relaunch is only a fallback for builds without that manifest.
     if cfg!(windows) && !skip_elevation && !syscleanx_core::sys::is_admin() && syscleanx_core::sys::relaunch_elevated("--elevated") {
         return Ok(());
     }

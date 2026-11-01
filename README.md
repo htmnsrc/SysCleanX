@@ -36,7 +36,7 @@ Everything is designed around one rule: **clean thoroughly, but never break Wind
 - [Building from source](#building-from-source)
 - [Project structure](#project-structure)
 - [FAQ](#faq)
-- [What's new in 2.0](#whats-new-in-20)
+- [What's new](#whats-new)
 - [Contributing](#contributing) · [License](#license)
 
 ## Highlights
@@ -49,7 +49,7 @@ Everything is designed around one rule: **clean thoroughly, but never break Wind
 - **Startup manager** that works exactly like Task Manager's (every change is reversible).
 - **Debloat** preinstalled Microsoft Store apps from a curated, protected list.
 - **Repair** broken shortcuts, dead startup entries and orphaned leftovers of removed programs.
-- **Disk usage** explorer and a content-based **duplicate finder**.
+- **Disk usage** explorer (show or delete what fills your drive) and a content-based **duplicate finder**.
 - **Fast**: written in Rust; scans run in parallel and every page stays responsive.
 - Dark and light themes with five accent colours.
 
@@ -77,7 +77,7 @@ its shortcuts and registry entries, then asks whether to also delete your settin
 Silent install and uninstall for scripted deployments:
 
 ```bat
-SysCleanX-Setup-2.0.0.exe /S
+SysCleanX-Setup-2.0.1.exe /S
 "C:\Program Files\SysCleanX\Uninstall.exe" /S
 ```
 
@@ -89,20 +89,37 @@ Settings are stored in your user profile either way.
 ### Requirements
 
 - Windows 10 or 11, 64-bit
-- Administrator rights for system-wide cleaning (SysCleanX asks when it starts; if you decline, it runs
-  in a limited mode where system items are marked *needs admin*)
+- Administrator rights: SysCleanX always runs as administrator, so Windows asks for permission (UAC)
+  each time it starts
 - A graphics driver with OpenGL 2.0 or newer (any normal PC; very bare virtual machines may lack it)
 
-> **"Windows protected your PC"**: the installer is not code-signed yet, so Microsoft SmartScreen warns
-> the first time you run it. Click **More info → Run anyway**.
+> **"Windows protected your PC"**: the installer isn't code-signed, so Microsoft SmartScreen warns the
+> first time you run it. Click **More info → Run anyway**. Once installed, SysCleanX opens normally from the
+> Start menu.
 
 ## Screenshots
 
-| | |
-|:---:|:---:|
-| <img src="docs/screenshots/clean-details.png" alt="Clean page with a category expanded"/><br/>**Clean**: every item shows its safety level, what it removes and its size | <img src="docs/screenshots/clean-light.png" alt="Light theme with teal accent"/><br/>**Light theme** with the teal accent |
-| <img src="docs/screenshots/apps.png" alt="Apps page"/><br/>**Apps → Programs**: complete uninstaller | <img src="docs/screenshots/store.png" alt="Store apps page"/><br/>**Apps → Store apps**: remove preinstalled bloat |
-| <img src="docs/screenshots/startup.png" alt="Startup page"/><br/>**Startup**: reversible, Task Manager compatible | <img src="docs/screenshots/settings.png" alt="Settings page"/><br/>**Settings**: theme, accent, exclusions |
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="docs/screenshots/clean-details.png" alt="Clean page with a category expanded"/><br/><b>Clean</b>: every item shows its safety level, what it removes and its size</td>
+    <td width="50%" align="center"><img src="docs/screenshots/clean-light.png" alt="Light theme with teal accent"/><br/><b>Light theme</b> with the teal accent</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/apps.png" alt="Apps page"/><br/><b>Apps → Programs</b>: complete uninstaller</td>
+    <td align="center"><img src="docs/screenshots/store.png" alt="Store apps page"/><br/><b>Apps → Store apps</b>: remove preinstalled bloat</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/startup.png" alt="Startup page"/><br/><b>Startup</b>: reversible, Task Manager compatible</td>
+    <td align="center"><img src="docs/screenshots/repair.png" alt="Repair page"/><br/><b>Tools → Repair</b>: broken shortcuts, dead entries and leftovers</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/disk.png" alt="Disk usage page"/><br/><b>Tools → Disk usage</b>: see what fills a drive, then show or delete it</td>
+    <td align="center"><img src="docs/screenshots/duplicates.png" alt="Duplicates page"/><br/><b>Tools → Duplicates</b>: identical files by content, one copy always kept</td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img src="docs/screenshots/settings.png" width="50%" alt="Settings page"/><br/><b>Settings</b>: theme, accent, exclusions</td>
+  </tr>
+</table>
 
 ## Using SysCleanX
 
@@ -119,8 +136,10 @@ SysCleanX scans as soon as it opens. Nothing is ever deleted until you press **C
 - a bar of your system drive: used space, the junk part of it (highlighted) and the space you gain
 - when you last cleaned and how much SysCleanX has freed in total
 - **Create a restore point first**: when on, SysCleanX creates a System Restore point before cleaning
-  (needs System Protection turned on for your system drive; if that fails you can cancel or clean
-  without it)
+  (needs System Protection turned on for your system drive). Windows can take a few minutes, so a timer
+  shows how long it has been running: **Skip restore point** cleans without one, **Cancel** stops with
+  nothing deleted. If Windows hasn't finished after 5 minutes, or the restore point fails, SysCleanX asks
+  whether to clean without it.
 
 **Presets** at the top right select items for you:
 
@@ -128,7 +147,7 @@ SysCleanX scans as soon as it opens. Nothing is ever deleted until you press **C
 |---|---|
 | **Safe** | Only items marked Safe: caches and temp files that apps rebuild by themselves |
 | **Recommended** | Safe items plus Recommended ones (the default) |
-| **Custom** | Shown when you pick items yourself; clicking it opens every category |
+| **Custom** | Your own picks. Choosing it opens every category so you can tick exactly what you want |
 
 **Categories** (System, Browsers, Applications, Developer, Deep Clean, Privacy, Advanced) start collapsed.
 Each shows how many of its items are selected, what it covers, its size and a bar with its share of all
@@ -148,7 +167,8 @@ Other labels you may see:
 
 - **In use**: the app that owns this cache is running (for example Chrome). It is unticked so the app is
   not disturbed. Close the app, or tick the item to clean anyway; files the app is using are skipped.
-- **Admin**: needs administrator rights (restart SysCleanX as administrator from the sidebar).
+- **Admin**: needs administrator rights. SysCleanX normally always runs as administrator; if it doesn't,
+  use **Restart as admin** at the bottom of the sidebar.
 - **tick to measure**: a few expert items (old drivers, orphaned installer packages, old restore points)
   are slow to measure, so they are only measured once you select them.
 - **Show N items with nothing to clean** at the bottom reveals items that are currently empty.
@@ -190,7 +210,9 @@ Removes preinstalled Microsoft Store apps. Apps are grouped as:
 Core parts of Windows can never be removed (they show a lock): Microsoft Store, App Installer (winget),
 Windows Security, Photos, Notepad, Terminal, Paint, Snipping Tool, Calculator, media codecs and runtimes.
 **Also for new user accounts** prevents removed apps from being installed for future accounts.
-Removed apps can be reinstalled from the Microsoft Store at any time.
+**Restore point first** creates a restore point before anything is removed (the same setting as on the
+Clean page). Apps are removed one at a time, so **Cancel** stops between apps. Removed apps can be
+reinstalled from the Microsoft Store at any time.
 
 ### Startup
 
@@ -227,8 +249,12 @@ on. Turning it off also disables Fast Startup.
 #### Disk usage
 
 Pick a drive (or type a folder) and press **Analyze**. You get a folder tree sorted by size with bars you
-can click to drill down, plus the **100 largest files** with their age, a button to show each in Explorer
-and one to move it to the Recycle Bin.
+can click to drill down, plus the **100 largest files** with their age and location.
+
+Hover any folder or file to **Show** it in Explorer or **Delete** it. Deleting asks for confirmation,
+moves the item to the Recycle Bin (so it can be restored) and updates the sizes straight away. Windows
+itself, whole drives, user profiles, special folders such as Documents, and system files like
+`pagefile.sys` can't be deleted here; folders that belong to installed programs show a warning first.
 
 #### Duplicates
 
@@ -469,7 +495,7 @@ built-in preview mode with sample data, captures every page into `docs/screensho
 preview mode exists only in debug builds:
 
 ```sh
-cargo run -p syscleanx --features screenshot   # with SYSCLEANX_DEMO=1 and SYSCLEANX_PAGE=clean|apps|store|startup|tools|disk|duplicates|settings
+cargo run -p syscleanx --features screenshot   # with SYSCLEANX_DEMO=1 and SYSCLEANX_PAGE=clean|apps|store|startup|repair|disk|duplicates|settings
 ```
 
 **Publishing a release**
@@ -500,6 +526,8 @@ SysCleanX/
 │   │       ├── duplicates.rs  duplicate finder
 │   │       └── sys/           Win32 calls (and stand-ins so the engine builds on any OS)
 │   └── gui/                   the desktop app (egui)
+│       ├── assets/            icon and app.manifest (run as administrator, sharp text on high-DPI screens)
+│       ├── build.rs           embeds the icon, version info and manifest into the exe
 │       └── src/
 │           ├── app.rs         window, sidebar, page switching
 │           ├── theme.rs       colours and animated widgets
@@ -518,18 +546,19 @@ has a hard-coded list of folders it can never touch (see
 user-chosen deletions go to the Recycle Bin. Expert items are clearly marked and never selected for you.
 
 **Why does it ask for administrator rights?**
-Windows' own temp folder, update caches, logs and other system locations can only be cleaned as
-administrator. If you decline, SysCleanX still works for your personal files and marks system items
-*needs admin*.
+Windows' own temp folder, update caches, logs, startup entries for all users and other system locations
+can only be changed as administrator, so SysCleanX always starts as administrator and Windows asks for
+permission first.
 
 **Why is Chrome or Edge marked "In use"?**
 The browser is running. Edge often keeps running in the background (Startup boost). Close the browser,
 or tick the item to clean anyway; files in use are skipped.
 
-**Creating a restore point failed.**
-System Protection is probably off for your system drive (Control Panel → System → System Protection).
-Turn it on, or clean without a restore point. Windows also creates at most one restore point per 24
-hours; if one already exists, that one is used.
+**Creating a restore point takes long or fails.**
+Windows can take a few minutes, especially the first time in a day; you can **Skip restore point** at any
+time to clean without one, or **Cancel**. If it fails, System Protection is probably off for your system
+drive (Control Panel → System → System Protection): turn it on, or clean without a restore point.
+Windows also creates at most one restore point per 24 hours; if one already exists, that one is used.
 
 **Can I undo a clean?**
 Caches and temp files are rebuilt by the apps that use them. Uninstall leftovers, duplicates, large
@@ -537,8 +566,9 @@ files and broken shortcuts are in the Recycle Bin, registry changes have `.reg` 
 changes can be switched back. With a restore point you can also roll back system changes.
 
 **My antivirus or SmartScreen complains.**
-SysCleanX is not code-signed yet, which some security tools treat with suspicion. The full source code is
-in this repository and you can build it yourself.
+SysCleanX isn't code-signed, which SmartScreen and some security tools treat with suspicion. Right-click the
+downloaded file → **Properties** → tick **Unblock** to open it normally. The full source code is in this
+repository and you can build it yourself.
 
 **Does it run on 32-bit Windows, Windows 7/8, macOS or Linux?**
 No. SysCleanX targets 64-bit Windows 10 and 11.
@@ -546,7 +576,24 @@ No. SysCleanX targets 64-bit Windows 10 and 11.
 **Where is the old Python version?**
 SysCleanX 1.x (Python) is in the git history of this repository. Version 2.0 replaces it completely.
 
-## What's new in 2.0
+## What's new
+
+### 2.0.1
+
+- **Restore points can no longer get stuck.** A timer shows how long Windows has been working on it,
+  **Skip restore point** carries on without one and **Cancel** really stops, with nothing deleted. After
+  5 minutes SysCleanX stops waiting and asks whether to clean without a restore point. Removing Store apps
+  works the same way.
+- **Always runs as administrator**, however it is opened (Start menu, desktop, Win + R or the
+  installer's finish page), so every item and tool is available.
+- **Delete from Disk usage**: hover a folder or file to show it in Explorer or move it to the Recycle Bin.
+  Windows, user profiles and other critical locations are protected.
+- The **Custom** preset now stays selected and opens every category.
+- Store apps are removed one at a time, so **Cancel** takes effect between apps.
+- Easier-to-read numbers (968,003 files), and **Cancel** shows "Stopping…" until the task has stopped.
+- Repair no longer shows the size of orphaned app data twice.
+
+### 2.0
 
 SysCleanX 2.0 is a complete rewrite in Rust.
 

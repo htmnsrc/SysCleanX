@@ -129,7 +129,7 @@ pub fn find(roots: &[PathBuf], min_size: u64, progress: &Progress) -> Vec<DupGro
             files: g.into_iter().map(|(path, _, modified)| DupFile { path, modified }).collect(),
         })
         .collect();
-    out.sort_by(|a, b| b.wasted().cmp(&a.wasted()));
+    out.sort_by_key(|g| std::cmp::Reverse(g.wasted()));
     out
 }
 
@@ -150,7 +150,7 @@ mod tests {
         fs::write(root.join("c.bin"), &almost).unwrap();
         fs::write(root.join("small1"), b"hello").unwrap();
         fs::write(root.join("small2"), b"hello").unwrap();
-        let groups = find(&[root.clone()], 10, &Progress::default());
+        let groups = find(std::slice::from_ref(&root), 10, &Progress::default());
         assert_eq!(groups.len(), 1, "{groups:?}");
         assert_eq!(groups[0].files.len(), 2);
         assert_eq!(groups[0].wasted(), 100_000);

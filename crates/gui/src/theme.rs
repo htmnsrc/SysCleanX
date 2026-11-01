@@ -462,24 +462,38 @@ pub fn animated_bytes(ui: &Ui, id: Id, bytes: u64) -> String {
 /// Compact "working" indicator: spinner, label, cancel link and a slim progress bar.
 /// Returns true if cancel was clicked.
 pub fn progress_row(ui: &mut Ui, p: &Palette, progress: &Progress, show_bytes: bool) -> bool {
+    progress_row_ext(ui, p, progress, show_bytes, None).0
+}
+
+/// Like `progress_row`, with an optional extra action next to Cancel.
+/// Returns (cancel clicked, extra clicked).
+pub fn progress_row_ext(ui: &mut Ui, p: &Palette, progress: &Progress, show_bytes: bool, extra: Option<&str>) -> (bool, bool) {
     let mut cancel = false;
+    let mut extra_clicked = false;
     ui.horizontal(|ui| {
         ui.add(egui::Spinner::new().size(14.0).color(p.accent));
         let mut label = progress.label();
         if show_bytes && progress.files() > 0 {
-            label = format!("{label}  ·  {} files, {}", progress.files(), syscleanx_core::format_bytes(progress.bytes()));
+            label = format!("{label}  ·  {} files, {}", syscleanx_core::format_count(progress.files()), syscleanx_core::format_bytes(progress.bytes()));
         }
         ui.add(egui::Label::new(RichText::new(label).color(p.muted).size(13.0)).truncate());
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if !progress.is_cancelled() && pill_sized(ui, p, "Cancel", Kind::Ghost, true, 26.0, 13.0).clicked() {
-                progress.cancel();
-                cancel = true;
+            if progress.is_cancelled() {
+                ui.label(RichText::new("Stopping…").color(p.muted).size(13.0));
+            } else {
+                if pill_sized(ui, p, "Cancel", Kind::Ghost, true, 26.0, 13.0).clicked() {
+                    progress.cancel();
+                    cancel = true;
+                }
+                if let Some(label) = extra {
+                    extra_clicked = pill_sized(ui, p, label, Kind::Ghost, true, 26.0, 13.0).clicked();
+                }
             }
         });
     });
     slim_progress(ui, p, progress.fraction());
     ui.add_space(6.0);
-    cancel
+    (cancel, extra_clicked)
 }
 
 pub fn modal_title(ui: &mut Ui, text: &str) {

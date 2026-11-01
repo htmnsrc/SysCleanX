@@ -2,3 +2,6 @@ target/
 dist/
 installer/build/
 .DS_Store
+
+# Local planning notes
+PLAN.md

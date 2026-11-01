@@ -94,6 +94,9 @@ impl SysCleanXApp {
             self.uninstaller.demo();
             self.startup.demo();
             self.debloat.demo();
+            self.disk.demo();
+            self.repair.demo();
+            self.duplicates.demo();
         }
         if let Ok(name) = std::env::var("SYSCLEANX_PAGE") {
             let (page, tab) = match name.to_lowercase().as_str() {

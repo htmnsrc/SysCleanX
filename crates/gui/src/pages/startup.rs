@@ -8,10 +8,13 @@ use syscleanx_core::startup::{self, Source, StartupItem};
 use syscleanx_core::sys;
 use syscleanx_core::util::{expand_env, split_command};
 
+/// Row index, the state it was switched to, and the outcome.
+type ToggleResult = (usize, bool, Result<(), String>);
+
 pub struct StartupPage {
     items: Vec<StartupItem>,
     job: Option<Job<Vec<StartupItem>>>,
-    toggle_job: Option<Job<(usize, bool, Result<(), String>)>>,
+    toggle_job: Option<Job<ToggleResult>>,
     loaded: bool,
 }
 
@@ -93,7 +96,7 @@ impl StartupPage {
             let broken = self.items.iter().filter(|i| i.missing).count();
             let mut summary = format!("{} of {} start automatically", enabled, self.items.len());
             if broken > 0 {
-                summary.push_str(&format!(" · {broken} point to missing programs (remove them in Tools → Repair)"));
+                summary.push_str(&format!(" · {broken} point to missing programs (remove them in Tools › Repair)"));
             }
             ui.label(muted(&p, summary).size(13.0));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

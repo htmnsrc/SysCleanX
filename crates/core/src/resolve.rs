@@ -166,7 +166,7 @@ mod tests {
         mk("Claimed/Code Cache");
 
         let claimed = vec![norm_key(&root.join("Claimed").join("Code Cache"))];
-        let found = discover_app_caches(&[root.clone()], &claimed);
+        let found = discover_app_caches(std::slice::from_ref(&root), &claimed);
         let rel: Vec<String> = found
             .iter()
             .map(|p| p.strip_prefix(&root).unwrap().to_string_lossy().replace('\\', "/"))
